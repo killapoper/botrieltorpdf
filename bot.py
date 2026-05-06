@@ -41,6 +41,16 @@ async def check_subscription(user_id: int) -> bool:
         # Если бот не админ в канале, проверка может не работать
         return True # В случае ошибки пропускаем, чтобы не блокировать бота совсем
 
+# Создание папки для данных, если она не существует (для докера)
+DATA_DIR = "data"
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+# Пути к файлам
+PDF_FILENAME = os.path.join(DATA_DIR, "presentation.pdf")
+USERS_FILE = os.path.join(DATA_DIR, "users.txt")
+LEADS_FILE = os.path.join(DATA_DIR, "leads.txt")
+
 def trim_file(filename: str, max_lines: int = 1000):
     """Обрезает файл, оставляя только последние max_lines строк."""
     try:
@@ -183,14 +193,14 @@ async def command_start_handler(message: Message, state: FSMContext) -> None:
     try:
         user_id = str(message.from_user.id)
         users = []
-        if os.path.exists("users.txt"):
-            with open("users.txt", "r", encoding="utf-8") as f:
+        if os.path.exists(USERS_FILE):
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
                 users = f.read().splitlines()
         
         if user_id not in users:
-            with open("users.txt", "a", encoding="utf-8") as f:
+            with open(USERS_FILE, "a", encoding="utf-8") as f:
                 f.write(user_id + "\n")
-            trim_file("users.txt") # Чистим, если превышен лимит
+            trim_file(USERS_FILE) # Чистим, если превышен лимит
     except Exception as e:
         logger.error(f"Ошибка при сохранении пользователя: {e}")
 
@@ -370,9 +380,9 @@ async def finalize_quiz(message: Message, user, state: FSMContext) -> None:
 
     # 2. Запись в файл leads.txt (каждый пук записан)
     try:
-        with open("leads.txt", "a", encoding="utf-8") as f:
+        with open(LEADS_FILE, "a", encoding="utf-8") as f:
             f.write(f"{now} | {user.id} | {username} | {contact_info} | {q1}/{q2}/{q3}/{q4}\n")
-        trim_file("leads.txt") # Чистим старые заявки, если их слишком много
+        trim_file(LEADS_FILE) # Чистим старые заявки, если их слишком много
     except Exception as e:
         logger.error(f"Ошибка при записи в файл: {e}")
 
@@ -396,13 +406,13 @@ async def admin_stats(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS: return
     
     total_users = 0
-    if os.path.exists("users.txt"):
-        with open("users.txt", "r", encoding="utf-8") as f:
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
             total_users = len(f.read().splitlines())
             
     total_leads = 0
-    if os.path.exists("leads.txt"):
-        with open("leads.txt", "r", encoding="utf-8") as f:
+    if os.path.exists(LEADS_FILE):
+        with open(LEADS_FILE, "r", encoding="utf-8") as f:
             total_leads = len(f.read().splitlines())
             
     text = (
@@ -418,11 +428,11 @@ async def admin_stats(callback: CallbackQuery):
 async def admin_leads(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS: return
     
-    if not os.path.exists("leads.txt"):
+    if not os.path.exists(LEADS_FILE):
         await callback.message.answer("Заявок пока нет.")
         return
         
-    with open("leads.txt", "r", encoding="utf-8") as f:
+    with open(LEADS_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()[-10:] # Берем последние 10
         
     text = "📋 <b>Последние 10 заявок:</b>\n\n" + "".join(lines)
