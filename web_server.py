@@ -23,31 +23,39 @@ CORS(app)  # Разрешаем CORS для запросов с сайта
 # ID администраторов
 ADMIN_IDS = [1652676928, 327895912]
 
-# Инициализация бота
-bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-
 # Путь к файлу для сохранения заявок с сайта
 SITE_LEADS_FILE = os.path.join("data", "site_leads.txt")
 
 def send_telegram_notification(report, now, name, phone, service_type):
     """Отправка уведомления в Telegram (синхронная обертка)"""
-    async def _send():
-        # Отправляем уведомление всем админам
-        for admin_id in ADMIN_IDS:
-            try:
-                await bot.send_message(admin_id, report)
-                logger.info(f"Заявка отправлена админу {admin_id}")
-            except Exception as e:
-                logger.error(f"Ошибка отправки админу {admin_id}: {e}")
+    logger.info("Начало отправки уведомления в Telegram")
 
-        # Закрываем сессию бота
-        await bot.session.close()
+    async def _send():
+        # Создаём новый экземпляр бота для этой отправки
+        logger.info(f"Создание бота с токеном: {TELEGRAM_BOT_TOKEN[:10]}...")
+        temp_bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+        try:
+            # Отправляем уведомление всем админам
+            for admin_id in ADMIN_IDS:
+                try:
+                    logger.info(f"Отправка сообщения админу {admin_id}")
+                    await temp_bot.send_message(admin_id, report)
+                    logger.info(f"✅ Заявка успешно отправлена админу {admin_id}")
+                except Exception as e:
+                    logger.error(f"❌ Ошибка отправки админу {admin_id}: {e}", exc_info=True)
+        finally:
+            # Закрываем сессию бота
+            logger.info("Закрытие сессии бота")
+            await temp_bot.session.close()
 
     # Запускаем в новом event loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(_send())
+        logger.info("Отправка уведомления завершена")
+    except Exception as e:
+        logger.error(f"Критическая ошибка при отправке: {e}", exc_info=True)
     finally:
         loop.close()
 
@@ -55,7 +63,9 @@ def send_telegram_notification(report, now, name, phone, service_type):
 def submit_form():
     """Обработка заявки с сайта"""
     try:
+        logger.info("Получен запрос на /api/submit-form")
         data = request.get_json()
+        logger.info(f"Данные формы: {data}")
 
         # Получаем данные из формы
         name = data.get('name', 'Не указано')
@@ -75,6 +85,8 @@ def submit_form():
             f"💡 <i>Источник: Лендинг</i>"
         )
 
+        logger.info(f"Отправка уведомления в Telegram для админов: {ADMIN_IDS}")
+
         # Отправляем уведомление в отдельном потоке
         thread = threading.Thread(
             target=send_telegram_notification,
@@ -87,6 +99,7 @@ def submit_form():
             os.makedirs("data", exist_ok=True)
             with open(SITE_LEADS_FILE, "a", encoding="utf-8") as f:
                 f.write(f"{now} | {name} | {phone} | {service_type}\n")
+            logger.info(f"Заявка сохранена в {SITE_LEADS_FILE}")
         except Exception as e:
             logger.error(f"Ошибка записи в файл: {e}")
 
@@ -96,7 +109,7 @@ def submit_form():
         }), 200
 
     except Exception as e:
-        logger.error(f"Ошибка обработки заявки: {e}")
+        logger.error(f"Ошибка обработки заявки: {e}", exc_info=True)
         return jsonify({
             "success": False,
             "message": "Произошла ошибка при отправке заявки"
