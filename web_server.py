@@ -121,5 +121,7 @@ def health_check():
     return jsonify({"status": "ok"}), 200
 
 if __name__ == '__main__':
-    # Запускаем сервер на порту 5000
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Запускаем сервер на порту из переменной окружения или 5000 по умолчанию
+    port = int(os.getenv('PORT', 5000))
+    logger.info(f"Запуск веб-сервера на порту {port}")
+    app.run(host='0.0.0.0', port=port, debug=False)
