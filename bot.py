@@ -50,6 +50,7 @@ if not os.path.exists(DATA_DIR):
 PDF_FILENAME = os.path.join(DATA_DIR, "presentation.pdf")
 USERS_FILE = os.path.join(DATA_DIR, "users.txt")
 LEADS_FILE = os.path.join(DATA_DIR, "leads.txt")
+SITE_LEADS_FILE = os.path.join(DATA_DIR, "site_leads.txt")
 
 def trim_file(filename: str, max_lines: int = 1000):
     """Обрезает файл, оставляя только последние max_lines строк."""
@@ -158,7 +159,8 @@ def get_phone_keyboard():
 def get_admin_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="📋 Последние заявки", callback_data="admin_leads")],
+        [InlineKeyboardButton(text="📋 Заявки из бота", callback_data="admin_leads")],
+        [InlineKeyboardButton(text="🌐 Заявки с сайта", callback_data="admin_site_leads")],
         [InlineKeyboardButton(text="🔄 Обновить PDF", callback_data="admin_update_pdf")]
     ])
 
@@ -404,22 +406,29 @@ async def admin_panel(message: Message):
 @dp.callback_query(F.data == "admin_stats")
 async def admin_stats(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS: return
-    
+
     total_users = 0
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r", encoding="utf-8") as f:
             total_users = len(f.read().splitlines())
-            
+
     total_leads = 0
     if os.path.exists(LEADS_FILE):
         with open(LEADS_FILE, "r", encoding="utf-8") as f:
             total_leads = len(f.read().splitlines())
-            
+
+    total_site_leads = 0
+    if os.path.exists(SITE_LEADS_FILE):
+        with open(SITE_LEADS_FILE, "r", encoding="utf-8") as f:
+            total_site_leads = len(f.read().splitlines())
+
     text = (
         "📈 <b>Аналитика бота</b>\n\n"
         f"👥 Всего пользователей (открыли бота): {total_users}\n"
-        f"📝 Всего заявок (прошли квиз): {total_leads}\n"
-        f"🎯 Конверсия: {round(total_leads/total_users*100, 1) if total_users > 0 else 0}%"
+        f"📝 Заявок из бота (прошли квиз): {total_leads}\n"
+        f"🌐 Заявок с сайта: {total_site_leads}\n"
+        f"📊 Всего заявок: {total_leads + total_site_leads}\n"
+        f"🎯 Конверсия бота: {round(total_leads/total_users*100, 1) if total_users > 0 else 0}%"
     )
     await callback.message.answer(text)
     await callback.answer()
@@ -427,15 +436,30 @@ async def admin_stats(callback: CallbackQuery):
 @dp.callback_query(F.data == "admin_leads")
 async def admin_leads(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS: return
-    
+
     if not os.path.exists(LEADS_FILE):
-        await callback.message.answer("Заявок пока нет.")
+        await callback.message.answer("Заявок из бота пока нет.")
         return
-        
+
     with open(LEADS_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()[-10:] # Берем последние 10
-        
-    text = "📋 <b>Последние 10 заявок:</b>\n\n" + "".join(lines)
+
+    text = "📋 <b>Последние 10 заявок из бота:</b>\n\n" + "".join(lines)
+    await callback.message.answer(text)
+    await callback.answer()
+
+@dp.callback_query(F.data == "admin_site_leads")
+async def admin_site_leads(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS: return
+
+    if not os.path.exists(SITE_LEADS_FILE):
+        await callback.message.answer("Заявок с сайта пока нет.")
+        return
+
+    with open(SITE_LEADS_FILE, "r", encoding="utf-8") as f:
+        lines = f.readlines()[-10:] # Берем последние 10
+
+    text = "🌐 <b>Последние 10 заявок с сайта:</b>\n\n" + "".join(lines)
     await callback.message.answer(text)
     await callback.answer()
 

@@ -7,3 +7,24 @@ env/
 venv/
 ENV/
 presentation.pdf
+
+# Данные (не коммитим в git)
+data/
+*.txt
+!requirements.txt
+
+# Логи
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Тестовые файлы (не нужны на проде)
+test_integration.py
